@@ -1,0 +1,519 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script src="jquery-3.2.1.js"></script>
+</head>
+<body style="background:black;">
+<!-- 
+	Since my Wife wants a Mac, we gotta do this again.  But this time in HTML!
+	
+	give an animation of us arriving at DISNEY WORLD and with fireworks and "Ohs and Ahs"
+	then give a planner window to calculate key arrival times with or without stops
+	
+-->
+<div id="main_overlay" style="left:0;top:0;z-index:1000;position:fixed;color:gray;opacity:40%;width:100vw;height:100vh;"><center></center></div>
+<!-- load in the images and "visibility=hidden(visible)" them, other than the window-->
+<center><div id="background" style="z-index:0;">
+	<!-- give the background img -->
+	<img src="img/disneyCastle.png" />
+	
+	<!-- wyatt and jesse are on the other side of the car -->
+	<img src="img/possum.png" id="jesse" style="visibility: hidden;position:fixed;"/>
+	<img src="img/wyatt.png" id="wyatt" style="visibility: hidden;position:fixed;"/>
+	<!-- now the car -->
+	<img src="img/atlas.png" id="car" style="transform: scaleX(-1);visibility: visible;position:fixed;"/>
+	<!-- now the rest of the passengers -->
+	<img src="img/wyatt.png" id="wyatt" style="visibility: hidden;position:fixed;"/>
+	<img src="img/van.png" id="van" style="visibility: hidden;position:fixed;"/>
+	<img src="img/hannah.png" id="hannah" style="visibility: hidden;position:fixed;"/>
+	<img src="img/mariah.png" id="mariah" style="visibility: hidden;position:fixed;"/>
+	<!-- now import our fireworks -->
+	<img src="img/bigfireworks1.png" id="fireworks" style="visibility: hidden;position:fixed;"/>
+
+</div></center>
+
+<!--give an overlay div for the car to hide under-->
+<div id="left_overlay" style="z-index:100;height:100%;background:black;position:fixed;left:0px;top:0px;">
+	<!-- now get the timer images -->
+	<img src="img/dialback.png" id="dialback" style="display: none;position:fixed;"/>
+	<img src="img/dial_selector.png" id="selector" style="display: none;position:fixed;"/>
+	<img src="img/toggleon.png" width="40vw" class="sleepToggles" id="toggleon1" style="display: none;position:fixed;"/>
+	<img src="img/toggleon.png" width="40vw" class="sleepToggles" id="toggleon2" style="display: none;position:fixed;"/>
+	<img src="img/toggleoff.png" width="40vw" class="sleepToggles" id="toggleoff1" style="display: none;position:fixed;"/>
+	<img src="img/toggleoff.png" width="40vw" class="sleepToggles" id="toggleoff2" style="display: none;position:fixed;"/>
+	<img src="img/dial_selector.png" id="selector" style="display: none;position:fixed;"/>
+	<div id="route_times" style="display:none;position:fixed;width:50vw;height:90vh;left:30vw;top:20px;"></div>
+	
+</div>
+<div id="clock" style="left:70vw;top:10px;font-size:8vh;color:red;position:fixed;width:28vw;height:20vh;"></div>
+<script>
+
+//setup the background
+$('#background img').css({'height':'80vh'})
+
+
+
+//////////////////////////////////////////////////////
+//	GET STARTED										//
+//////////////////////////////////////////////////////
+
+
+const background={};
+background.width=$('#background img').width()
+background.height=$('#background img').height()
+background.pos=$('#background img').position()
+
+//load the audio files
+var wow1 = new Audio('sounds/wow1.wav');
+var wow2 = new Audio('sounds/wow2.wav');
+var wow3 = new Audio('sounds/wow3.wav');
+var wow4 = new Audio('sounds/wow4.wav');
+var wow5 = new Audio('sounds/wow5.wav');
+var yay = new Audio('sounds/yay.wav');
+var fireworks1 = new Audio('sounds/fireworks1.wav');
+var fireworks2 = new Audio('sounds/fireworks2.wav');
+var fireworks3 = new Audio('sounds/fireworks3.wav');
+var song = new Audio('sounds/song.wav');
+
+function getRandomInt(max) {
+  return Math.floor(Math.random() * max);
+}
+
+
+class Person {
+  constructor(name,rel_perc_pos) {
+    this.name = name;
+    this.img = $('img#'+name);
+	this.pos=rel_perc_pos;//given in percentage location on the car
+  }
+}
+
+wyatt=new Person('wyatt',[-3,-50]);
+van=new Person('van',[10,-20])
+hannah=new Person('hannah',[50,-20])
+mariah=new Person('mariah',[30,-20])
+jesse=new Person('jesse',[75,-10])
+
+const car={};
+car.going=true
+car.went=false
+car.load=function(){
+	//target the car image
+	car.img=$('img#car')
+	
+	//resize and flip the car
+	car.target_width=background.width*.4
+	car.size_perc=car.target_width/$(car.img).width()
+	$(car.img).css({'width':($(car.img).width()*car.size_perc)+'px','height':($(car.img).height()*car.size_perc)+'px'})
+	
+	//place the car img
+	car.width=$(car.img).width()
+	car.height=$(car.img).height()
+	$(car.img).css({'left':background.pos.left-car.width,'top':(background.pos.top+background.height-car.height)})
+	car.move_distance=car.width+background.width*.1
+	
+	//now get the passengers
+	car.passengers={}
+	car.passengers.wyatt=wyatt
+	car.passengers.van=van
+	car.passengers.hannah=hannah
+	car.passengers.mariah=mariah
+	car.passengers.jesse=jesse
+	
+	//change the img sizes=
+	$.each(car.passengers,function(){
+		var head_scale=(car.width*.25)/$(this.img).width()
+		var head_width=head_scale*$(this.img).width()
+		var head_height=head_scale*$(this.img).height()
+		$(this.img).css({'width':head_width+'px','height':head_height+'px'})
+	})
+}
+car.load()
+car.drive=function(){
+	if(car.going){
+		car.went=true
+		$(car.img).animate({
+			left: "+="+car.move_distance,
+		}, 1000, function() {
+			// Animation complete.
+			setTimeout(function(){car.getout()},500)
+		});
+	}
+}
+car.getout=function(){
+	//place the people in relation to their percentage position on the car
+	w=car.width
+	h=car.height
+	car.pos=$(car.img).position()
+	l=car.pos.left
+	t=car.pos.top
+	$.each(car.passengers,function(){
+		//calc position
+		var x
+		var y
+		x=this.pos[0]
+		y=this.pos[1]
+		x=parseInt((x/100)*w)
+		y=parseInt((y/100)*h)
+		//console.log(this.name)
+		//console.log('x,y',x,y)
+		//console.log('w,h',parseInt(w),parseInt(h))
+		x=x+parseInt(l)
+		y=y+parseInt(t)
+		
+		$(this.img).css({'left':parseInt(x)+'px','top':parseInt(y)+'px','visibility':'visible'})
+	})
+	
+	yay.play()
+	car.ohandah()
+}
+car.ohandah=function(){
+	var chance=getRandomInt(5)+1;
+	if(chance==1){wow1.play()}
+	else if(chance==2){wow2.play()}
+	else if(chance==3){wow3.play()}
+	else if(chance==4){wow4.play()}
+	else if(chance==5){wow5.play()}
+	car.going=false
+	fireworks.loop()
+}
+
+
+//////////////////////////////////////////////////////
+//	FIREWORKS										//
+//////////////////////////////////////////////////////
+//make some fireworks
+fireworks={}
+fireworks.sound1=fireworks1
+fireworks.sound2=fireworks2
+fireworks.sound3=fireworks3
+fireworks.img=$('img#fireworks')
+fireworks.width=background.width*.5
+fireworks.height=background.height*.3
+$(fireworks.img).css({'width':fireworks.width+'px','height':fireworks.height+'px'})
+fireworks.going=true
+fireworks.place=function(){
+	w=background.width
+	h=background.height
+	l=background.pos.left
+	x=l+(w*(getRandomInt(70)/100))
+	y=h*(getRandomInt(10)/100)
+	
+	fireworks.pos={}
+	fireworks.pos.left=x
+	fireworks.pos.height=y
+	$(fireworks.img).css({'left':x+'px','top':y+'px'})
+}
+fireworks.blink=function(){
+	$(fireworks.img).css({'visibility':'hidden'})
+	setTimeout(function(){
+		fireworks.loop()
+	},100*(getRandomInt(10)+10))
+}
+fireworks.loop=function(){
+	if(fireworks.going){
+		fireworks.place()
+		$(fireworks.img).css({'visibility':'visible'})
+		
+		//do sound
+		var rand=getRandomInt(2)
+		if(rand==0){fireworks.sound1.play()}
+		if(rand==1){fireworks.sound2.play()}
+		if(rand==2){fireworks.sound3.play()}
+		
+		setTimeout(function(){
+			fireworks.blink()
+		},500)
+	}
+}
+
+
+
+
+
+
+//give us a start button so audio can play...'cause google...
+//update the left_overlay to fit the screensize
+$('#left_overlay').css({'width':background.pos.left+'px'})
+$('#main_overlay').css({'font-size':'80px'})
+$('#main_overlay center').append('<div style="cursor:pointer;" id="start">START</div>')
+$('#start').click(function(){
+	$('#planner').show()
+	$('#main_overlay').remove()
+	song.play()
+	car.drive()
+})
+
+
+
+
+//////////////////////////////////////////////////////
+//	PLANNER FUNCTIONS								//
+//////////////////////////////////////////////////////
+//give a planner button to plan out our trip
+planner={}
+//the planner will track times in minutes of the day
+planner.leaveTimes=[3*60,4*60,5*60,6*60,21*60,22*60,21*60]
+//give a variable to track our trip
+planner.trip=3*60
+//give trip leg times
+planner.mem=(2*60)+14
+planner.tupelo=(60)+48
+planner.birm=(60)+59
+planner.atl=(2*60)+43
+planner.macon=(60)+30
+planner.tifton=(60)+34
+planner.gainsville=(2*60)+20
+planner.orlando=(60)+44
+
+planner.sleepATL=false
+planner.sleepMACON=false
+//create a function to show the route-time planner
+
+$('#left_overlay').append('<div style="position:fixed;display:none;" id="atlsleeplabel">SLEEP IN ATL</div>')
+$('#left_overlay').append('<div style="position:fixed;display:none;" id="maconsleeplabel">SLEEP IN MACON</div>')
+planner.show=function(){
+	$('body img,#start,#planner').hide()
+	car.going=false
+	fireworks.going=false
+	$('#top_menu').show()
+	
+	//place toggles
+	$('img#toggleoff1,img#toggleon1').css({'cursor':'pointer','left':'15vw','top':'5vh'})
+	$('img#toggleoff2,img#toggleon2').css({'cursor':'pointer','left':'15vw','top':'25vh'})
+	$('div#atlsleeplabel').show()
+	$('div#maconsleeplabel').show()
+	//console.log($('#toggleoff1').css('top'))
+	$('div#atlsleeplabel').css({'left':parseInt($('#toggleoff1').css('left'))+$('#toggleoff1').width(),'top':parseInt($('#toggleoff1').css('top'))+($('#toggleoff1').height()/2)-($('#atlsleeplabel').height()/2)})
+	$('div#maconsleeplabel').css({'left':parseInt($('#toggleoff2').css('left'))+$('#toggleoff2').width(),'top':parseInt($('#toggleoff2').css('top'))+($('#toggleoff2').height()/2)-($('#maconsleeplabel').height()/2)})
+	
+	//show the planner dial
+	$(planner.dial.back).show()
+	$(planner.dial.selector).css({'cursor':'pointer'})
+	$(planner.dial.selector).show()
+	$('div#route_times').show()
+	planner.update()
+}
+planner.change_sleep_atl=function(){
+	planner.sleepMACON=false
+	if(planner.sleepATL==false){
+		planner.sleepATL=true
+	}
+	else{
+		planner.sleepATL=false
+	}
+	planner.update()
+}
+planner.change_sleep_macon=function(){
+	planner.sleepATL=false
+	if(planner.sleepMACON==false){
+		planner.sleepMACON=true
+	}
+	else{
+		planner.sleepMACON=false
+	}
+	planner.update()
+}
+
+//create the dial selector
+planner.dial={}
+planner.reverse=false
+planner.dial.back=$('img#dialback')
+planner.dial.pos=$(planner.dial.back).position()
+planner.dial.pos.left=50
+planner.dial.pos.top=50
+planner.dial.rotate=0
+planner.dial.selected=0
+planner.dial.selector=$('img#selector')
+//rescale the dial and the selector
+var scale=(background.width*.3)/$(planner.dial.back).width()
+$(planner.dial.back).css({'left':planner.dial.pos.left,'top':planner.dial.pos.top,'width':background.width*.3,'height':scale*$(planner.dial.back).height()})
+$(planner.dial.selector).css({'width':scale*$(planner.dial.selector).width(),'height':scale*$(planner.dial.selector).height()})
+
+//create auto center function for the dial
+planner.dial.center_selector=function(){
+	var dial_left=planner.dial.pos.left
+	var dial_top=planner.dial.pos.top
+	var dial_half_width=$(planner.dial.back).width()/2
+	var dial_half_height=$(planner.dial.back).height()/2
+	
+	var x=dial_left+dial_half_width
+	var y=dial_top+dial_half_height
+	
+	x=x-($(planner.dial.selector).width()/2)
+	y=y-($(planner.dial.selector).height()/2)
+	
+	$(planner.dial.selector).css({'left':x,'top':y})
+}
+planner.dial.center_selector()
+//turn the dial
+$(planner.dial.selector).click(function(){
+	planner.dial.rotate=planner.dial.rotate+30
+	planner.dial.selected=planner.dial.selected+1
+	if(planner.dial.rotate>180){
+		planner.dial.rotate=0
+		planner.dial.selected=0
+	}
+	$(planner.dial.selector).css({'transform':'rotate('+planner.dial.rotate+'deg)'})
+	planner.update()
+})
+
+planner.showSleep=function(){
+	$('.sleepToggles').hide()
+	$('#atlsleeplabel,#maconsleeplabel').css({'color':'white'})
+	if(planner.sleepATL){$('img#toggleon1').show();$('#atlsleeplabel').css({'color':'cyan'})}
+	else{$('img#toggleoff1').show();}
+	if(planner.sleepMACON){$('img#toggleon2').show();$('#maconsleeplabel').css({'color':'cyan'})}
+	else{$('img#toggleoff2').show()}
+}
+planner.calc=function(triptime,leg){
+	//trip times calculated in mins
+	var updatedtime=triptime+leg
+	//track eat times
+	var breakfast=false
+	var lunch=false
+	var dinner=false
+	
+	pm='am'
+	hr=parseInt(updatedtime/60)
+	min=parseInt(updatedtime-(hr*60))
+	if(min<10){min='0'+min}
+	if(hr>24){hr=hr-24;}
+	else if(hr>12){hr=hr-12;pm='pm';}
+	
+	//add eat times after arrival times
+	if(triptime<(8*60) && updatedtime>(8*60)){updatedtime=updatedtime+60;}//add breakfast hour
+	else if(triptime<(12*60) && updatedtime>(12*60)){updatedtime=updatedtime+60;}//add lunch hour
+	else if(triptime<(18*60) && updatedtime>(18*60)){updatedtime=updatedtime+60;}//add dinner hour
+	
+	planner.trip=updatedtime
+	
+	return hr+':'+min+pm
+}
+planner.update=function(){
+	$('body div#route_times *').remove()
+	
+	planner.showSleep()
+	
+	var color='white'
+	
+	if(planner.reverse==false){
+		//planner.mem=(2*60)+14
+		//planner.tupelo=(60)+48
+		//planner.birm=(60)+59
+		//planner.atl=(2*60)+43
+		//planner.macon=(60)+30
+		//planner.tifton=(60)+34
+		//planner.gainsville=(2*60)+20
+		//planner.orlando=(60)+44
+		var one=planner.mem
+		var two=planner.tupelo
+		var three=planner.birm
+		var four=planner.atl
+		var five=planner.macon
+		var six=planner.tifton
+		var seven=planner.gainsville
+		var eight=planner.orlando
+		
+		planner.trip=planner.leaveTimes[planner.dial.selected]
+		
+		$('#route_times').append('<table id="spreadsheet" style="cursor:pointer;"></table>')
+		tr='<tr><td class="leg">HOME=>MEMPHIS</td><td class="arrival">'+planner.calc(planner.trip,one)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		tr='<tr><td class="leg">MEMPHIS=>TUPELO</td><td class="arrival">'+planner.calc(planner.trip,two)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		tr='<tr><td class="leg">TUPELO=>BIRMINGHAM</td><td class="arrival">'+planner.calc(planner.trip,three)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		tr='<tr><td class="leg">BIRMINGHAM=>ATLANTA</td><td class="arrival">'+planner.calc(planner.trip,four)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		if(planner.sleepATL){planner.trip=planner.leaveTimes[planner.dial.selected];color='cyan';}
+		tr='<tr style="color:'+color+';"><td class="leg">ATLANTA=>MACON,GA</td><td class="arrival">'+planner.calc(planner.trip,five)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		if(planner.sleepMACON){planner.trip=planner.leaveTimes[planner.dial.selected];color='cyan';}
+		tr='<tr style="color:'+color+';"><td class="leg">MACON,GA=>TIFTON,GA</td><td class="arrival">'+planner.calc(planner.trip,six)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		tr='<tr style="color:'+color+';"><td class="leg">TIFTON,GA=>GAINSVILLE,FL</td><td class="arrival">'+planner.calc(planner.trip,seven)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		tr='<tr style="color:'+color+';"><td class="leg">GAINSVILLE,FL=>ORLANDO</td><td class="arrival">'+planner.calc(planner.trip,eight)+'</td></tr>'
+		$('#spreadsheet').append(tr)
+		
+		
+		//style the table
+		$('tr,td').css({'border':'1px solid white','padding-right':'10px','padding-left':'10px'})
+	}
+}
+$('#toggleon1,#toggleoff1').click(function(){planner.change_sleep_atl()})
+$('#toggleon2,#toggleoff2').click(function(){planner.change_sleep_macon()})
+
+//give a planner button
+$('#left_overlay').append('<div id="planner" style="display:none;">PLANNER</div>')
+$('#planner').click(function(){
+	planner.show()
+})
+//give a back button
+$('#left_overlay').append('<div id="top_menu" style="display:none;">BACK</div>')
+$('#top_menu').click(function(){
+	$('#route_times table').remove()
+	$('img#dialback,img#selector,.sleepToggles').hide();$('#left_overlay div').hide()
+	$('center img,#start,#planner').show()
+	if(car.went==false){car.going=true}
+	fireworks.going=true
+	$('#top_menu').hide()
+	fireworks.loop()
+})
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////
+//	CLOCK FUNCTIONS									//
+//////////////////////////////////////////////////////
+const clock={}
+clock.div=$('#clock')
+clock.currentdate=new Date()
+clock.leavedate=new Date('October 31, 2024 00:00:00')
+clock.gettimetoleave=function(){
+	clock.currentdate=new Date()
+	var milliseconds_left=clock.leavedate-clock.currentdate
+	var seconds_left=milliseconds_left/1000
+	//console.log('seconds_left',seconds_left)
+	clock.days_left=parseInt(seconds_left/86400)
+	
+	seconds_left=seconds_left-(clock.days_left*86400)//remove the days left
+	
+	clock.hours_left=parseInt((seconds_left/60)/60)
+	
+	seconds_left=seconds_left-((clock.hours_left*60)*60)//remove the hours left
+	console.log('hours removed',seconds_left)
+	
+	clock.minutes_left=parseInt(seconds_left/60)
+	
+	clock.seconds_left=parseInt(seconds_left-((clock.minutes_left*60)))//remove the minutes left
+	console.log('minutes removed',seconds_left)
+	
+	clock.time_string=clock.days_left+' Days, '+clock.hours_left+':'+clock.minutes_left+':'+clock.seconds_left
+	
+	return clock.time_string
+}
+clock.update=function(){
+	clock.time=clock.gettimetoleave()
+	$(clock.div).text(clock.time)
+	setTimeout(function(){clock.update()},1000)
+}
+clock.update()
+
+//////////////////////////////////////////////////////
+//	CLEANUP FUNCTIONS								//
+//////////////////////////////////////////////////////
+
+//css the buttons
+$('div#left_overlay div').css({'font-size':(background.height*.05)+'px','color':'white','cursor':'pointer'})
+$('div#left_overlay #atlsleeplabel,div#left_overlay #maconsleeplabel').css({'font-size':(background.height*.04)+'px','cursor':'default'})
+
+
+</script>
+</body>
+</html>
